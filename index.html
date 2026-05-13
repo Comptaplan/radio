@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compta Plan Radio</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #fff;
+      background:
+        radial-gradient(circle at top left, rgba(255,122,24,.28), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(255,209,102,.16), transparent 32%),
+        #080b14;
+    }
+
+    .player {
+      width: 100%;
+      max-width: 430px;
+      padding: 30px;
+      border-radius: 30px;
+      text-align: center;
+      background: rgba(18,22,35,.94);
+      border: 1px solid rgba(255,255,255,.1);
+      box-shadow: 0 25px 60px rgba(0,0,0,.45);
+    }
+
+    .logo {
+      width: 160px;
+      height: 160px;
+      margin: 0 auto 22px;
+      padding: 5px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff7a18, #ffd166);
+      box-shadow: 0 15px 35px rgba(255,122,24,.3);
+    }
+
+    .logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.7rem;
+    }
+
+    .status {
+      margin-top: 10px;
+      color: #b9c2d0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      font-size: .95rem;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ff7a18;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.5); opacity: .45; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .now-playing {
+      margin: 25px 0;
+      padding: 18px;
+      min-height: 76px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .now-playing small {
+      display: block;
+      margin-bottom: 6px;
+      color: #b9c2d0;
+    }
+
+    .track {
+      line-height: 1.5;
+      font-size: 1rem;
+      word-break: break-word;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      padding: 16px 30px;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #111;
+      background: linear-gradient(135deg, #ff7a18, #ffd166);
+      box-shadow: 0 12px 30px rgba(255,122,24,.25);
+    }
+
+    .volume {
+      margin-top: 25px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #b9c2d0;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #ff7a18;
+    }
+
+    .message {
+      margin-top: 18px;
+      font-size: .9rem;
+      color: #ffbcbc;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="player">
+
+    <div class="logo">
+      <img src="https://www.comptaplan.be/icon.png?7aadf4905bfe2bc3" alt="Logo Compta Plan Radio">
+    </div>
+
+    <h1>Compta Plan Radio</h1>
+
+    <div class="status">
+      <span class="dot"></span>
+      <span id="statusText">Prêt à écouter</span>
+    </div>
+
+    <div class="now-playing">
+      <small>Titre en cours</small>
+      <div class="track" id="trackName">Chargement...</div>
+    </div>
+
+    <button id="playBtn">▶ Écouter</button>
+
+    <div class="volume">
+      Volume
+      <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8">
+    </div>
+
+    <div class="message" id="message"></div>
+
+  </div>
+
+  <audio id="radio" preload="none"></audio>
+
+  <script>
+    const STREAM_URL = "https://webradio.cloudvip.com:8000/radio.mp3";
+    const NOW_PLAYING_API = "https://webradio.cloudvip.com/api/nowplaying";
+
+    const radio = document.getElementById("radio");
+    const playBtn = document.getElementById("playBtn");
+    const volume = document.getElementById("volume");
+    const statusText = document.getElementById("statusText");
+    const trackName = document.getElementById("trackName");
+    const message = document.getElementById("message");
+
+    radio.src = STREAM_URL;
+    radio.volume = Number(volume.value);
+
+    playBtn.addEventListener("click", async () => {
+      if (radio.paused) {
+        try {
+          await radio.play();
+          playBtn.textContent = "⏸ Pause";
+          statusText.textContent = "En direct";
+          message.textContent = "";
+        } catch (error) {
+          message.textContent = "Impossible de lancer la radio.";
+        }
+      } else {
+        radio.pause();
+        playBtn.textContent = "▶ Écouter";
+        statusText.textContent = "En pause";
+      }
+    });
+
+    volume.addEventListener("input", () => {
+      radio.volume = Number(volume.value);
+    });
+
+    async function updateNowPlaying() {
+      try {
+        const response = await fetch(NOW_PLAYING_API, { cache: "no-store" });
+        const data = await response.json();
+
+        let station = null;
+
+        if (Array.isArray(data)) {
+          station = data.find(item =>
+            item.station &&
+            (
+              item.station.name?.toLowerCase().includes("compta") ||
+              item.station.shortcode?.toLowerCase().includes("compta")
+            )
+          ) || data[0];
+        } else {
+          station = data;
+        }
+
+        const song = station?.now_playing?.song;
+
+        const artist = song?.artist?.trim();
+        const title = song?.title?.trim();
+        const text = song?.text?.trim();
+
+        if (artist && title) {
+          trackName.textContent = artist + " - " + title;
+        } else if (text) {
+          trackName.textContent = text;
+        } else if (title) {
+          trackName.textContent = title;
+        } else if (artist) {
+          trackName.textContent = artist;
+        } else {
+          trackName.textContent = "Titre non disponible";
+        }
+
+      } catch (error) {
+        trackName.textContent = "Titre non disponible";
+      }
+    }
+
+    updateNowPlaying();
+    setInterval(updateNowPlaying, 15000);
+  </script>
+
+</body>
+</html>
